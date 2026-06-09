@@ -1,0 +1,54 @@
+{
+  "name": "pi-permission-gate",
+  "version": "0.1.0",
+  "description": "Config-driven permission system for Pi agents. Deny-by-default tool restriction with glob matching, path normalization, self-protection, and structured logging.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Juanje Ojeda",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/juanje/pi-permission-gate"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "permissions",
+    "security",
+    "guardrails"
+  ],
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "test": "vitest run",
+    "check": "tsc --noEmit && biome check . && vitest run"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-agent-core": "*",
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.14",
+    "@earendil-works/pi-coding-agent": "^0.74.0",
+    "typescript": "^5.0.0",
+    "vitest": "^3.2.0"
+  }
+}
