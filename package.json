@@ -1,13 +1,13 @@
 {
   "name": "pi-permission-gate",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Config-driven permission system for Pi agents. Deny-by-default tool restriction with glob matching, path normalization, self-protection, and structured logging.",
   "type": "module",
   "license": "MIT",
   "author": "Juanje Ojeda",
   "repository": {
     "type": "git",
-    "url": "https://github.com/juanje/pi-permission-gate"
+    "url": "git+https://github.com/juanje/pi-permission-gate.git"
   },
   "keywords": [
     "pi-package",
