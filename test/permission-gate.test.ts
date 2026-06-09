@@ -520,3 +520,163 @@ describe("initLog and logDecision", () => {
     expect(entry.input).toHaveLength(MAX_LOG_INPUT_LENGTH);
   });
 });
+
+describe("secret redaction in logs", () => {
+  it("redacts Anthropic API keys", () => {
+    const dir = makeTempDir("pg-redact-");
+    const logPath = join(dir, "test.jsonl");
+    logDecision(
+      "bash",
+      "curl -H 'x-api-key: sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijk'",
+      "allow",
+      "test",
+      logPath,
+    );
+    const entry = JSON.parse(readFileSync(logPath, "utf8").trim());
+    expect(entry.input).not.toContain("sk-ant-api03-");
+    expect(entry.input).toContain("[REDACTED");
+  });
+
+  it("redacts GitHub PATs", () => {
+    const dir = makeTempDir("pg-redact-gh-");
+    const logPath = join(dir, "test.jsonl");
+    logDecision(
+      "bash",
+      "git clone https://ghp_1234567890abcdefghijklmnopqrstuvwxyz@github.com/repo",
+      "allow",
+      "test",
+      logPath,
+    );
+    const entry = JSON.parse(readFileSync(logPath, "utf8").trim());
+    expect(entry.input).not.toContain("ghp_1234567890");
+    expect(entry.input).toContain("[REDACTED");
+  });
+
+  it("redacts GitLab PATs", () => {
+    const dir = makeTempDir("pg-redact-gl-");
+    const logPath = join(dir, "test.jsonl");
+    logDecision("bash", "export GITLAB_TOKEN=glpat-abcdefghij1234567890", "allow", "test", logPath);
+    const entry = JSON.parse(readFileSync(logPath, "utf8").trim());
+    expect(entry.input).not.toContain("glpat-");
+    expect(entry.input).toContain("[REDACTED");
+  });
+
+  it("redacts Slack user tokens", () => {
+    const dir = makeTempDir("pg-redact-slack-");
+    const logPath = join(dir, "test.jsonl");
+    const fakeSlackToken = [
+      "xoxp",
+      "123456789012",
+      "123456789012",
+      "1234567890123",
+      "abcdef1234567890abcdef1234567890",
+    ].join("-");
+    logDecision("bash", `export SLACK_TOKEN=${fakeSlackToken}`, "allow", "test", logPath);
+    const entry = JSON.parse(readFileSync(logPath, "utf8").trim());
+    expect(entry.input).not.toContain("xoxp-");
+    expect(entry.input).toContain("[REDACTED");
+  });
+
+  it("redacts JWT tokens", () => {
+    const dir = makeTempDir("pg-redact-jwt-");
+    const logPath = join(dir, "test.jsonl");
+    logDecision(
+      "bash",
+      "curl -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U'",
+      "allow",
+      "test",
+      logPath,
+    );
+    const entry = JSON.parse(readFileSync(logPath, "utf8").trim());
+    expect(entry.input).not.toContain("eyJhbGci");
+    expect(entry.input).toContain("[REDACTED");
+  });
+
+  it("leaves safe inputs unchanged", () => {
+    const dir = makeTempDir("pg-redact-safe-");
+    const logPath = join(dir, "test.jsonl");
+    const safeInput = "bin/gitlab-query upstream /pipelines --source schedule";
+    logDecision("bash", safeInput, "allow", "test", logPath);
+    const entry = JSON.parse(readFileSync(logPath, "utf8").trim());
+    expect(entry.input).toBe(safeInput);
+  });
+
+  it("redacts AWS access keys", () => {
+    const dir = makeTempDir("pg-redact-aws-");
+    const logPath = join(dir, "test.jsonl");
+    logDecision("bash", "export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE", "allow", "test", logPath);
+    const entry = JSON.parse(readFileSync(logPath, "utf8").trim());
+    expect(entry.input).not.toContain("AKIAIOSFODNN7EXAMPLE");
+    expect(entry.input).toContain("[REDACTED");
+  });
+
+  it("redacts AWS secret access key by variable name", () => {
+    const dir = makeTempDir("pg-redact-aws-secret-");
+    const logPath = join(dir, "test.jsonl");
+    logDecision(
+      "bash",
+      "export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+      "allow",
+      "test",
+      logPath,
+    );
+    const entry = JSON.parse(readFileSync(logPath, "utf8").trim());
+    expect(entry.input).not.toContain("wJalrXUtnFEMI");
+    expect(entry.input).toContain("[REDACTED");
+  });
+
+  it("redacts generic PASSWORD= assignments", () => {
+    const dir = makeTempDir("pg-redact-pass-");
+    const logPath = join(dir, "test.jsonl");
+    logDecision("bash", "export DB_PASSWORD=supersecret123", "allow", "test", logPath);
+    const entry = JSON.parse(readFileSync(logPath, "utf8").trim());
+    expect(entry.input).not.toContain("supersecret123");
+    expect(entry.input).toContain("[REDACTED");
+  });
+
+  it("redacts PRIVATE_KEY= assignments", () => {
+    const dir = makeTempDir("pg-redact-privkey-");
+    const logPath = join(dir, "test.jsonl");
+    logDecision(
+      "bash",
+      "GITLAB_PRIVATE_TOKEN=glpat-abcdefghij1234567890",
+      "allow",
+      "test",
+      logPath,
+    );
+    const entry = JSON.parse(readFileSync(logPath, "utf8").trim());
+    expect(entry.input).not.toContain("glpat-abcdefghij");
+    expect(entry.input).toContain("[REDACTED");
+  });
+
+  it("redacts DATABASE_URL connection strings", () => {
+    const dir = makeTempDir("pg-redact-dburl-");
+    const logPath = join(dir, "test.jsonl");
+    logDecision(
+      "bash",
+      "export DATABASE_URL=postgres://user:pass123@db.example.com:5432/mydb",
+      "allow",
+      "test",
+      logPath,
+    );
+    const entry = JSON.parse(readFileSync(logPath, "utf8").trim());
+    expect(entry.input).not.toContain("pass123@db.example.com");
+    expect(entry.input).toContain("[REDACTED");
+  });
+
+  it("redacts secrets in the reason field too", () => {
+    const dir = makeTempDir("pg-redact-reason-");
+    const logPath = join(dir, "test.jsonl");
+    logDecision(
+      "bash",
+      "curl with ghp_1234567890abcdefghijklmnopqrstuvwxyz",
+      "deny",
+      "'curl with ghp_1234567890abcdefghijklmnopqrstuvwxyz' matches deny",
+      logPath,
+    );
+    const entry = JSON.parse(readFileSync(logPath, "utf8").trim());
+    expect(entry.input).not.toContain("ghp_1234567890");
+    expect(entry.reason).not.toContain("ghp_1234567890");
+    expect(entry.reason).toContain("[REDACTED");
+  });
+});

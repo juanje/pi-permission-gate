@@ -68,9 +68,16 @@ For each tool call:
 
 Patterns use `*` (any sequence) and `?` (single character). Tilde expansion is supported in patterns (`~/.ssh/*`). Paths are normalized (`~`, `./`, `../`, absolute → relative) before matching.
 
+### Secret redaction
+
+Logged inputs and reasons are automatically scanned for credentials before writing. Two layers of detection:
+
+1. **Vendor prefixes** (via [secret-sniff](https://github.com/p-vbordei/secret-sniff)) — AWS `AKIA*`, GitHub `ghp_*`, GitLab `glpat-*`, Anthropic `sk-ant-*`, OpenAI `sk-proj-*`, Slack `xoxp-*`, Stripe, JWT, PEM, and more
+2. **Variable name patterns** — catches `SECRET=`, `_KEY=`, `_TOKEN=`, `PASSWORD=`, `CREDENTIAL=`, `AUTH=`, `DATABASE_URL=`, `REDIS_URL=`, and `Bearer` headers regardless of value format
+
 ### Structured log
 
-Each decision is appended to `.pi/logs/permission-gate_{timestamp}.jsonl`:
+Each decision is appended to `.pi/logs/permission-gate_{timestamp}.jsonl` (secrets redacted):
 
 ```json
 {"ts":"2026-06-09T00:05:16.733Z","tool":"bash","input":"cat .env","decision":"deny","reason":"'cat .env' matches deny pattern for bash"}

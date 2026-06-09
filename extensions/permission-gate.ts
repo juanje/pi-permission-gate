@@ -9,6 +9,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, normalize, relative } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { redact as baseRedact, DEFAULT_PATTERNS, type SecretPattern } from "secret-sniff";
 
 type Mode = "allow" | "deny";
 
@@ -38,6 +39,36 @@ const DEFAULT_POLICY: Policy = {
 };
 
 const MAX_LOG_INPUT_LENGTH = 200;
+
+const envAssignment = (names: string) =>
+  new RegExp(`(?:${names})[\\s]*[=:][\\s]*["']?([^\\s"',]{8,})["']?`, "gi");
+
+const EXTRA_SECRET_PATTERNS: SecretPattern[] = [
+  {
+    id: "env.secret-value",
+    regex: envAssignment("SECRET|_KEY|_TOKEN|PASSWORD|PASSWD|CREDENTIAL|AUTH"),
+    label: "secret env value",
+  },
+  {
+    id: "env.connection-string",
+    regex: envAssignment("DATABASE_URL|REDIS_URL|CONNECTION_STRING"),
+    label: "connection string",
+  },
+  {
+    id: "bearer.header",
+    regex: /[Bb]earer\s+[A-Za-z0-9._~+/=-]{20,}/g,
+    label: "Bearer token",
+  },
+];
+
+const ALL_SECRET_PATTERNS: readonly SecretPattern[] = [
+  ...DEFAULT_PATTERNS,
+  ...EXTRA_SECRET_PATTERNS,
+];
+
+function redact(text: string): string {
+  return baseRedact(text, { patterns: ALL_SECRET_PATTERNS });
+}
 
 const SELF_PROTECTED_PATHS = [
   ".pi/permissions.json",
@@ -95,9 +126,9 @@ function logDecision(
   const entry = {
     ts: new Date().toISOString(),
     tool,
-    input: input.slice(0, MAX_LOG_INPUT_LENGTH),
+    input: redact(input.slice(0, MAX_LOG_INPUT_LENGTH)),
     decision,
-    reason,
+    reason: reason ? redact(reason) : undefined,
   };
   try {
     appendFileSync(path, `${JSON.stringify(entry)}\n`);
@@ -307,5 +338,6 @@ export {
   mergePolicies,
   mergeToolRules,
   normalizePath,
+  redact,
   SELF_PROTECTED_PATHS,
 };
