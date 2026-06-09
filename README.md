@@ -4,14 +4,22 @@ Config-driven permission system for [Pi](https://pi.dev) agents. Deny-by-default
 
 ## Install
 
+From npm:
+
 ```bash
-pi install pi-permission-gate
+pi install npm:pi-permission-gate
 ```
 
-Or from git:
+From git:
 
 ```bash
 pi install git+https://github.com/juanje/pi-permission-gate.git
+```
+
+Or load directly without installing:
+
+```bash
+pi -e /path/to/pi-permission-gate/extensions/permission-gate.ts
 ```
 
 ## Quick start
@@ -115,12 +123,6 @@ git clone https://github.com/juanje/pi-permission-gate.git
 cd pi-permission-gate
 npm install
 npm run check    # typecheck + lint + test
-```
-
-Test locally in another project without publishing:
-
-```bash
-pi -e /path/to/pi-permission-gate/extensions/permission-gate.ts
 ```
 
 ## License
