@@ -83,7 +83,7 @@ function isSelfProtected(path: string): boolean {
 function globToRegex(pattern: string): RegExp {
   const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&");
   const regexSource = escaped.replace(/\*/g, ".*").replace(/\?/g, ".");
-  return new RegExp(`^${regexSource}$`);
+  return new RegExp(`^${regexSource}$`, "s");
 }
 
 function expandPattern(pattern: string): string {
@@ -264,6 +264,17 @@ function evaluateToolCall(
     const reason = `'${value}' matches deny pattern for ${toolName}`;
     logDecision(toolName, value, "deny", reason);
     return block(reason);
+  }
+
+  if (rule.deny && value.includes("\n")) {
+    for (const line of value.split("\n")) {
+      const trimmed = line.trim();
+      if (trimmed && rule.deny.some((pattern) => matchGlob(pattern, trimmed))) {
+        const reason = `Line '${trimmed}' matches deny pattern for ${toolName}`;
+        logDecision(toolName, value, "deny", reason);
+        return block(reason);
+      }
+    }
   }
 
   if (rule.paths?.deny?.some((pattern) => matchGlob(pattern, value))) {

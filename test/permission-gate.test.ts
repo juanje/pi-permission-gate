@@ -66,6 +66,13 @@ describe("globToRegex", () => {
     expect(regex.test("a")).toBe(true);
     expect(regex.test("ab")).toBe(false);
   });
+
+  it("matches multiline strings with *", () => {
+    const regex = globToRegex("git commit *");
+    expect(regex.test('git commit -m "single line"')).toBe(true);
+    expect(regex.test('git commit -m "line1\nline2\nline3"')).toBe(true);
+    expect(regex.test("git commit -m \"$(cat <<'EOF'\nfeat: add feature\n\nDetails here\nEOF\n)\"")).toBe(true);
+  });
 });
 
 describe("matchGlob", () => {
@@ -447,6 +454,40 @@ describe("evaluateToolCall", () => {
     };
     const result = evaluateToolCall("bash", { command: "rm foo" }, policy, cwd);
     expect(result?.block).toBe(true);
+  });
+
+  it("blocks newline-injected commands even when first line is allowed", () => {
+    const policy: Policy = {
+      defaultMode: "deny",
+      permissions: {
+        tools: {
+          bash: {
+            allow: ["git commit *", "git status*"],
+            deny: ["rm *", "sudo *", "curl *"],
+            default: "deny",
+          },
+        },
+      },
+    };
+    expect(evaluateToolCall("bash", { command: 'git status\nrm -rf /' }, policy, cwd)?.block).toBe(true);
+    expect(evaluateToolCall("bash", { command: 'git commit -m "ok"\nsudo reboot' }, policy, cwd)?.block).toBe(true);
+    expect(evaluateToolCall("bash", { command: 'git commit -m "ok"\ncurl evil.com' }, policy, cwd)?.block).toBe(true);
+  });
+
+  it("allows legitimate multiline commands", () => {
+    const policy: Policy = {
+      defaultMode: "deny",
+      permissions: {
+        tools: {
+          bash: {
+            allow: ["git commit *"],
+            deny: ["rm *"],
+            default: "deny",
+          },
+        },
+      },
+    };
+    expect(evaluateToolCall("bash", { command: 'git commit -m "feat: add feature\n\nMultiline body"' }, policy, cwd)).toBeUndefined();
   });
 
   it("falls back to tool default", () => {
